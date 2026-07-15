@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  font-family: Arial, Helvetica, ui-sans-serif, system-ui, sans-serif;
+  background: #f7f7f5;
+  color: #16181d;
+}
+
+/* Tarjeta KPI base */
+.kpi-card {
+  @apply rounded-lg bg-white border border-neutral-200 px-4 py-3;
+}
+.kpi-label {
+  @apply text-[10px] font-bold uppercase tracking-wider text-neutral-500;
+}
+.kpi-value {
+  @apply text-xl font-bold mt-0.5;
+}
+
+.input {
+  @apply w-full rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 transition;
+}
+.btn {
+  @apply inline-flex items-center gap-2 rounded-md px-3.5 py-2 text-sm font-semibold transition select-none;
+}
+.btn-dark {
+  @apply btn bg-neutral-900 text-white hover:bg-neutral-700;
+}
+.btn-ghost {
+  @apply btn text-neutral-600 hover:bg-neutral-100;
+}
+.btn-outline {
+  @apply btn border border-neutral-300 bg-white hover:border-neutral-900;
+}
+
+/* ── Exportación a PDF (impresión) ─────────────────────────── */
+@media print {
+  @page {
+    size: letter;
+    margin: 14mm 16mm;
+  }
+  body {
+    background: white !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .print-break {
+    break-before: page;
+  }
+  .avoid-break {
+    break-inside: avoid;
+  }
+}
+.print-only {
+  display: none;
+}
