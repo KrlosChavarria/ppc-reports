@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, History, FileText, ChevronDown, Download, Briefcase } from "lucide-react";
+import { useRef, useState } from "react";
+import { Plus, History, FileText, ChevronDown, Download, Upload, Briefcase, LogOut, Loader2 } from "lucide-react";
 import { uid } from "@/lib/store";
 import { RebrndLogo } from "./Logos";
 
 export default function Sidebar({
   clients, reports, activeClientId, view, activeReportId,
-  onSelectClient, onNavigate, onAddClient, onExportBackup,
+  onSelectClient, onNavigate, onAddClient, onExportBackup, onImportBackup, onLogout, saving,
 }) {
+  const fileRef = useRef(null);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
 
@@ -92,9 +93,35 @@ export default function Sidebar({
       </div>
 
       <div className="px-3 py-3 border-t border-white/10">
+        {saving && (
+          <p className="px-2.5 pb-1 text-[11px] text-neutral-400 flex items-center gap-1.5">
+            <Loader2 size={12} className="animate-spin" /> Guardando…
+          </p>
+        )}
         <button className="w-full flex items-center gap-2 rounded-md px-2.5 py-2 text-xs text-neutral-500 hover:bg-white/5 hover:text-white transition"
           onClick={onExportBackup}>
           <Download size={13} /> Respaldar datos (JSON)
+        </button>
+        <button className="w-full flex items-center gap-2 rounded-md px-2.5 py-2 text-xs text-neutral-500 hover:bg-white/5 hover:text-white transition"
+          onClick={() => fileRef.current?.click()}>
+          <Upload size={13} /> Importar respaldo (JSON)
+        </button>
+        <input ref={fileRef} type="file" accept="application/json,.json" className="hidden"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (!file) return;
+            try {
+              const data = JSON.parse(await file.text());
+              if (!confirm(`¿Importar ${data.reports?.length || 0} reporte(s) y ${data.clients?.length || 0} cliente(s)? Los que tengan el mismo id se actualizarán.`)) return;
+              await onImportBackup(data);
+            } catch (err) {
+              if (err instanceof SyntaxError) alert("El archivo no es un JSON válido.");
+            }
+          }} />
+        <button className="w-full flex items-center gap-2 rounded-md px-2.5 py-2 text-xs text-neutral-500 hover:bg-white/5 hover:text-white transition"
+          onClick={onLogout}>
+          <LogOut size={13} /> Cerrar sesión
         </button>
       </div>
     </aside>

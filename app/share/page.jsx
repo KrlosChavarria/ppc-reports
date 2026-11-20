@@ -5,18 +5,34 @@ import ReportView from "@/components/ReportView";
 import { RebrndLogo } from "@/components/Logos";
 import { decodeShare } from "@/lib/share";
 
+// Vista de solo lectura para el cliente.
+//  · /share?t=<token>  → lee del servidor (siempre actualizado)
+//  · /share#<datos>    → links antiguos con los datos embebidos en la URL
 export default function SharePage() {
   const [data, setData] = useState(null);
   const [reportId, setReportId] = useState(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("t");
     const hash = window.location.hash.slice(1);
-    if (!hash) { setError(true); return; }
-    decodeShare(hash)
+
+    const load = token
+      ? fetch(`/api/share/${encodeURIComponent(token)}`, { cache: "no-store" }).then((r) => {
+          if (!r.ok) throw new Error();
+          return r.json();
+        })
+      : hash
+        ? decodeShare(hash)
+        : Promise.reject();
+
+    load
       .then((payload) => {
         setData(payload);
-        setReportId(payload.activeId || payload.reports[0]?.id);
+        const wanted = params.get("r") || payload.activeId;
+        const exists = payload.reports.some((r) => r.id === wanted);
+        setReportId(exists ? wanted : payload.reports[payload.reports.length - 1]?.id);
       })
       .catch(() => setError(true));
   }, []);
@@ -54,10 +70,10 @@ export default function SharePage() {
             {data.reports.length > 1 && (
               <select
                 className="bg-white/10 text-white text-xs font-semibold rounded-md px-2 py-1.5 outline-none"
-                value={reportId}
+                value={reportId || ""}
                 onChange={(e) => setReportId(e.target.value)}
               >
-                {data.reports.map((r) => (
+                {[...data.reports].reverse().map((r) => (
                   <option key={r.id} value={r.id} className="text-black">{r.title}</option>
                 ))}
               </select>
@@ -67,13 +83,15 @@ export default function SharePage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-6 md:px-10 py-8">
-        {report && (
+        {report ? (
           <ReportView
             report={report}
             clientName={data.clientName}
             clientReports={data.reports}
             readOnly
           />
+        ) : (
+          <p className="text-center text-sm text-neutral-500">Aún no hay reportes publicados.</p>
         )}
       </main>
     </div>

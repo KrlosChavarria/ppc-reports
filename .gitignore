@@ -21,3 +21,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+
+# Base de datos local de desarrollo
+data/
+
+# Datos de clientes para la carga inicial (no subir a un repo público)
+seed/

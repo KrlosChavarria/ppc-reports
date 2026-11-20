@@ -7,7 +7,6 @@ import ArtesGallery from "./ArtesGallery";
 import { GoogleLogo, FacebookLogo } from "./Logos";
 import { PlatformBars, SpendDonut, TrendLine, GADS, META } from "./Charts";
 import { computeKpis, sumPlatforms, KPI_DEFS } from "@/lib/kpi";
-import { encodeShare } from "@/lib/share";
 
 function ComparativeTable({ report }) {
   const g = computeKpis(report.google);
@@ -193,7 +192,7 @@ function PrintLayout({ report, clientName }) {
   );
 }
 
-export default function ReportView({ report, clientName, clientReports, onEdit, onDelete, readOnly = false }) {
+export default function ReportView({ report, clientName, clientReports, shareToken, onEdit, onDelete, readOnly = false }) {
   const [tab, setTab] = useState("Resumen");
   const [copied, setCopied] = useState(false);
   const total = sumPlatforms(report.google, report.meta);
@@ -201,13 +200,9 @@ export default function ReportView({ report, clientName, clientReports, onEdit, 
   const TABS = ["Resumen", "Google Ads", "Meta Ads", "Comparativo", "Artes"];
 
   const handleShare = async () => {
-    const payload = {
-      clientName,
-      reports: clientReports,
-      activeId: report.id,
-    };
-    const hash = await encodeShare(payload);
-    const url = `${window.location.origin}/share#${hash}`;
+    if (!shareToken) return alert("Este cliente aún no tiene link. Recarga la página e intenta de nuevo.");
+    // Link fijo por cliente: siempre muestra los reportes más recientes del servidor.
+    const url = `${window.location.origin}/share?t=${shareToken}&r=${encodeURIComponent(report.id)}`;
     try {
       await navigator.clipboard.writeText(url);
     } catch {
