@@ -2,7 +2,7 @@
 
 import { computeKpis, sumPlatforms, fmtInt, fmtMoney, fmtPct } from "@/lib/kpi";
 import { TrendLine, HistoryGrouped, ReferralHistory, ReferralCostTrend } from "./Charts";
-import { REF_SOURCES, refCounts, hasReferrals } from "@/lib/referrals";
+import { REF_SOURCES, refCounts, refCosts, hasReferrals } from "@/lib/referrals";
 
 export default function HistoryPanel({ reports, clientName, onOpen }) {
   // Acumulados de todos los reportes del cliente
@@ -21,16 +21,18 @@ export default function HistoryPanel({ reports, clientName, onOpen }) {
   );
   const accK = computeKpis(acc);
 
-  // Referidos acumulados (solo reportes que los tienen capturados)
+  // Citas pagadas acumuladas (solo reportes que las tienen capturadas)
   const withRefs = reports.filter(hasReferrals);
   const refAcc = withRefs.reduce((a, r) => {
     const c = refCounts(r);
     REF_SOURCES.forEach((s) => (a[s.key] += c[s.key]));
     a.total += c.total;
-    const t = sumPlatforms(r.google, r.meta);
-    a.spend += t.spend;
+    a.ads += c.ads;
+    a.spend += computeKpis(r.google).spend + computeKpis(r.meta).spend;
+    a.gSpend += computeKpis(r.google).spend;
+    a.mSpend += computeKpis(r.meta).spend;
     return a;
-  }, { google: 0, facebook: 0, ai: 0, other: 0, total: 0, spend: 0 });
+  }, { google: 0, facebook: 0, ai: 0, other: 0, total: 0, ads: 0, spend: 0, gSpend: 0, mSpend: 0 });
 
   const cards = [
     { label: "Reportes", value: fmtInt(reports.length) },
@@ -42,10 +44,14 @@ export default function HistoryPanel({ reports, clientName, onOpen }) {
     { label: "Clics acumulados", value: fmtInt(accK.clicks) },
     { label: "CTR global", value: fmtPct(accK.ctr) },
     { label: "Avg. CPC global", value: fmtMoney(accK.avgCpc) },
-    { label: "Referidos acumulados", value: fmtInt(refAcc.total), hide: !withRefs.length,
+    { label: "CPA global", value: fmtMoney(refAcc.spend / refAcc.ads), hide: !refAcc.ads, dark: true,
+      sub: `Inversión / ${fmtInt(refAcc.ads)} citas por pauta · ${withRefs.length} reporte(s)` },
+    { label: "CPA Google global", value: fmtMoney(refAcc.gSpend / refAcc.google), hide: !refAcc.google,
+      sub: `${fmtInt(refAcc.google)} citas de Google` },
+    { label: "CPA Meta global", value: fmtMoney(refAcc.mSpend / refAcc.facebook), hide: !refAcc.facebook,
+      sub: `${fmtInt(refAcc.facebook)} citas de Facebook` },
+    { label: "Citas pagadas acumuladas", value: fmtInt(refAcc.total), hide: !withRefs.length,
       sub: REF_SOURCES.filter((s) => refAcc[s.key]).map((s) => `${s.label} ${refAcc[s.key]}`).join(" · ") },
-    { label: "Costo por referido global", value: fmtMoney(refAcc.spend / refAcc.total), hide: !refAcc.total,
-      sub: `En ${withRefs.length} reporte(s) con referidos` },
   ].filter((c) => !c.hide);
 
   return (
@@ -58,8 +64,8 @@ export default function HistoryPanel({ reports, clientName, onOpen }) {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {cards.map((c) => (
-          <div key={c.label} className="kpi-card">
-            <p className="kpi-label">{c.label}</p>
+          <div key={c.label} className={c.dark ? "rounded-lg bg-[#1C1E24] text-white px-4 py-3" : "kpi-card"}>
+            <p className={`kpi-label ${c.dark ? "!text-neutral-400" : ""}`}>{c.label}</p>
             <p className="kpi-value">{c.value}</p>
             {c.sub && <p className="text-[11px] text-neutral-400 mt-0.5 leading-snug">{c.sub}</p>}
           </div>
@@ -75,11 +81,15 @@ export default function HistoryPanel({ reports, clientName, onOpen }) {
           {withRefs.length >= 2 && (
             <>
               <div className="md:col-span-2">
-                <ReferralHistory reports={withRefs} title="Referidos por reporte · por fuente" height={280} />
+                <ReferralCostTrend reports={withRefs} height={260} />
               </div>
-              <ReferralCostTrend reports={withRefs} />
-              <TrendLine reports={reports} platform="total" metric="leads" title="Leads (Meta) en el tiempo"
-                subtitle="Para comparar contra los referidos: leads del formulario vs clientes que dijeron de dónde llegaron." />
+              <div className="md:col-span-2">
+                <ReferralHistory reports={withRefs} title="Citas pagadas por reporte · por fuente" height={280} />
+              </div>
+              <div className="md:col-span-2">
+                <TrendLine reports={reports} platform="total" metric="leads" title="Leads (Meta) en el tiempo"
+                  subtitle="Para comparar contra las citas: leads del formulario vs citas que sí pagaron." />
+              </div>
             </>
           )}
         </div>
@@ -100,7 +110,8 @@ export default function HistoryPanel({ reports, clientName, onOpen }) {
               <th className="px-4 py-3 kpi-label">Clics</th>
               <th className="px-4 py-3 kpi-label">CTR</th>
               <th className="px-4 py-3 kpi-label">Leads</th>
-              <th className="px-4 py-3 kpi-label">Referidos</th>
+              <th className="px-4 py-3 kpi-label">Citas</th>
+              <th className="px-4 py-3 kpi-label">CPA</th>
             </tr>
           </thead>
           <tbody>
@@ -116,6 +127,7 @@ export default function HistoryPanel({ reports, clientName, onOpen }) {
                   <td className="px-4 py-3">{fmtPct(t.ctr)}</td>
                   <td className="px-4 py-3">{t.leads ? fmtInt(t.leads) : "—"}</td>
                   <td className="px-4 py-3">{hasReferrals(r) ? fmtInt(refCounts(r).total) : "—"}</td>
+                  <td className="px-4 py-3 font-bold">{refCosts(r).total ? fmtMoney(refCosts(r).total) : "—"}</td>
                 </tr>
               );
             })}

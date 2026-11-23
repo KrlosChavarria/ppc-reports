@@ -128,9 +128,9 @@ function ReferralInputs({ form, onChange }) {
   return (
     <div className="rounded-lg bg-white border border-neutral-200 p-5">
       <div className="mb-4">
-        <h3 className="font-bold">Referidos</h3>
+        <h3 className="font-bold">Citas pagadas (CPA)</h3>
         <p className="text-xs text-neutral-400 mt-0.5">
-          Clientes que dijeron de dónde llegaron (tracker de referidos). Opcional: si no hay dato, déjalo vacío.
+          Citas presenciales pagadas o separaciones, según de dónde dijo venir cada persona. Con esto se calcula el CPA. Opcional: si no hay dato, déjalo vacío.
         </p>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -152,10 +152,10 @@ function ReferralInputs({ form, onChange }) {
       </label>
       <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-xs text-neutral-500 border-t border-neutral-100 pt-3">
         <span>Se calculan solos:</span>
-        <span><b className="text-neutral-800">Total</b> {c.total}</span>
-        {cost.total > 0 && <span><b className="text-neutral-800">Costo por referido</b> {fmtMoney(cost.total)}</span>}
-        {cost.google > 0 && <span><b className="text-neutral-800">Google</b> {fmtMoney(cost.google)}</span>}
-        {cost.facebook > 0 && <span><b className="text-neutral-800">Facebook</b> {fmtMoney(cost.facebook)}</span>}
+        <span><b className="text-neutral-800">Citas</b> {c.total}{c.organic ? ` (${c.ads} por pauta)` : ""}</span>
+        {cost.total > 0 && <span><b className="text-neutral-800">CPA general</b> {fmtMoney(cost.total)}</span>}
+        {cost.google > 0 && <span><b className="text-neutral-800">CPA Google</b> {fmtMoney(cost.google)}</span>}
+        {cost.facebook > 0 && <span><b className="text-neutral-800">CPA Meta</b> {fmtMoney(cost.facebook)}</span>}
       </div>
     </div>
   );
@@ -223,7 +223,7 @@ export default function ReportForm({ initial, clientName, onSave, onCancel }) {
       <PlatformInputs label="Meta Ads" accent={META} icon={<FacebookLogo size={20} />}
         value={form.meta} onChange={(v) => set({ meta: v })} />
 
-      {/* Referidos reportados por el cliente */}
+      {/* Citas pagadas reportadas por el cliente (CPA) */}
       <ReferralInputs form={form} onChange={(referrals) => set({ referrals })} />
 
       {/* Artes / creativos activos */}

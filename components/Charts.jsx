@@ -2,10 +2,10 @@
 
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
-  AreaChart, Area, Legend, PieChart, Pie, Cell, LabelList, ReferenceLine,
+  AreaChart, Area, Legend, PieChart, Pie, Cell, LabelList, ReferenceLine, LineChart, Line,
 } from "recharts";
 import { computeKpis, fmtMoney, fmtInt, fmtPct, fmtDec } from "@/lib/kpi";
-import { REF_SOURCES, refCounts, refCosts, hasReferrals } from "@/lib/referrals";
+import { REF_SOURCES, CPA_COLOR, refCounts, refCosts, hasReferrals } from "@/lib/referrals";
 
 export const GADS = "#4285F4";
 export const META = "#0866FF";
@@ -192,18 +192,18 @@ export function HistoryGrouped({ reports, metric, title, subtitle, money = false
   );
 }
 
-// ── Referidos: distribución por fuente (dona) ───────────────────
-export function ReferralDonut({ report, title = "Referidos por fuente", subtitle }) {
+// ── Citas pagadas: distribución por fuente (dona) ───────────────
+export function ReferralDonut({ report, title = "Citas pagadas por fuente", subtitle }) {
   const c = refCounts(report);
   const data = REF_SOURCES.filter((s) => c[s.key] > 0).map((s) => ({
     name: `${s.label} · ${fmtInt(c[s.key])} (${fmtPct((c[s.key] / c.total) * 100)})`,
     value: c[s.key], color: s.color,
   }));
   const empty = data.length === 0;
-  if (empty) data.push({ name: "Sin referidos", value: 1, color: "#E5E5E5" });
+  if (empty) data.push({ name: "Sin citas", value: 1, color: "#E5E5E5" });
   return (
     <ChartBox title={title}
-      subtitle={subtitle || `De dónde dijeron venir los ${fmtInt(c.total)} referidos del periodo.`} height={230}>
+      subtitle={subtitle || `De dónde dijeron venir las ${fmtInt(c.total)} citas pagadas del periodo.`} height={230}>
       <ResponsiveContainer>
         <PieChart>
           <Pie data={data} dataKey="value" nameKey="name" cx="38%" innerRadius={56} outerRadius={88}
@@ -219,15 +219,15 @@ export function ReferralDonut({ report, title = "Referidos por fuente", subtitle
   );
 }
 
-// ── Referidos: histórico apilado por fuente ─────────────────────
-export function ReferralHistory({ reports, title = "Referidos por reporte", subtitle, height = 260 }) {
+// ── Citas pagadas: histórico apilado por fuente ─────────────────
+export function ReferralHistory({ reports, title = "Citas pagadas por reporte", subtitle, height = 260 }) {
   const data = reports.filter(hasReferrals).map((r) => {
     const c = refCounts(r);
     return { name: r.title, ...Object.fromEntries(REF_SOURCES.map((s) => [s.label, c[s.key]])), total: c.total };
   });
   return (
     <ChartBox title={title}
-      subtitle={subtitle || "Cuántos referidos llegaron en cada reporte y de qué fuente. Solo incluye reportes con referidos capturados."}
+      subtitle={subtitle || "Cuántas citas pagadas hubo en cada reporte y de qué fuente. Solo incluye reportes con citas capturadas."}
       height={height}>
       <ResponsiveContainer>
         <BarChart data={data} margin={{ top: 20, right: 12, left: 4, bottom: 0 }}>
@@ -250,29 +250,33 @@ export function ReferralHistory({ reports, title = "Referidos por reporte", subt
   );
 }
 
-// ── Referidos: costo por referido en el tiempo ──────────────────
-export function ReferralCostTrend({ reports, title = "Costo por referido · histórico", subtitle }) {
-  const data = reports.filter(hasReferrals).map((r) => ({ name: r.title, value: refCosts(r).total }))
-    .filter((d) => d.value > 0);
+// ── CPA en el tiempo (general, Google y Meta) ───────────────────
+export function ReferralCostTrend({ reports, title = "CPA · histórico", subtitle, height = 240 }) {
+  const data = reports.filter(hasReferrals).map((r) => {
+    const k = refCosts(r);
+    return { name: r.title, General: k.total || null, "Google Ads": k.google || null, "Meta Ads": k.facebook || null };
+  });
+  const lines = [
+    { key: "General", color: CPA_COLOR, width: 3 },
+    { key: "Google Ads", color: "#4285F4", width: 2 },
+    { key: "Meta Ads", color: "#1E3A8A", width: 2 },
+  ];
   return (
     <ChartBox title={title}
-      subtitle={subtitle || "Inversión total del periodo entre referidos totales. Abajo es mejor."} height={220}>
+      subtitle={subtitle || "Costo por cita pagada en cada reporte. Abajo es mejor. Sin punto = esa semana no hubo citas de esa plataforma."}
+      height={height}>
       <ResponsiveContainer>
-        <AreaChart data={data} margin={{ top: 16, right: 20, left: 4, bottom: 0 }}>
-          <defs>
-            <linearGradient id="area-refcost" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#10A37F" stopOpacity={0.28} />
-              <stop offset="100%" stopColor="#10A37F" stopOpacity={0.02} />
-            </linearGradient>
-          </defs>
+        <LineChart data={data} margin={{ top: 16, right: 20, left: 4, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke="#F0F0F0" />
           <XAxis dataKey="name" tick={axisTick} axisLine={{ stroke: "#E5E5E5" }} tickLine={false} />
-          <YAxis tick={axisTick} axisLine={false} tickLine={false} width={52}
-            tickFormatter={(v) => "$" + fmtDec(v)} />
-          <Tooltip contentStyle={tooltipStyle} formatter={(v) => [fmtMoney(v), "Costo por referido"]} />
-          <Area type="monotone" dataKey="value" stroke="#10A37F" strokeWidth={2.5} fill="url(#area-refcost)"
-            dot={{ r: 4, fill: "#10A37F", strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 5 }} />
-        </AreaChart>
+          <YAxis tick={axisTick} axisLine={false} tickLine={false} width={56} tickFormatter={(v) => "$" + fmtDec(v)} />
+          <Tooltip contentStyle={tooltipStyle} formatter={(v, n) => [v ? fmtMoney(v) : "—", `CPA ${n}`]} />
+          <Legend iconType="circle" iconSize={9} wrapperStyle={{ fontSize: 12 }} />
+          {lines.map((l) => (
+            <Line key={l.key} type="linear" dataKey={l.key} stroke={l.color} strokeWidth={l.width}
+              dot={{ r: 3.5, fill: l.color, strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 5 }} connectNulls={false} />
+          ))}
+        </LineChart>
       </ResponsiveContainer>
     </ChartBox>
   );
