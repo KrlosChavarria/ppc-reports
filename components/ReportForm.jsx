@@ -7,6 +7,7 @@ import { uid } from "@/lib/store";
 import { compressImage, detectFormat } from "@/lib/share";
 import { GoogleLogo, FacebookLogo } from "./Logos";
 import { GADS, META } from "./Charts";
+import { REF_SOURCES, EMPTY_REFERRALS, refCounts, refCosts } from "@/lib/referrals";
 
 const EMPTY_PLATFORM = { impressions: "", clicks: "", spend: "", leads: "", reach: "", conversions: "" };
 
@@ -120,6 +121,46 @@ function ArtesUploader({ artes, onChange }) {
   );
 }
 
+function ReferralInputs({ form, onChange }) {
+  const value = { ...EMPTY_REFERRALS, ...(form.referrals || {}) };
+  const c = refCounts({ referrals: value });
+  const cost = refCosts({ ...form, referrals: value });
+  return (
+    <div className="rounded-lg bg-white border border-neutral-200 p-5">
+      <div className="mb-4">
+        <h3 className="font-bold">Referidos</h3>
+        <p className="text-xs text-neutral-400 mt-0.5">
+          Clientes que dijeron de dónde llegaron (tracker de referidos). Opcional: si no hay dato, déjalo vacío.
+        </p>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {REF_SOURCES.map((s) => (
+          <label key={s.key} className="block">
+            <span className="kpi-label flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full" style={{ background: s.color }} />
+              {s.label}
+            </span>
+            <input className="input mt-1" inputMode="numeric" placeholder="0" value={value[s.key]}
+              onChange={(e) => onChange({ ...value, [s.key]: e.target.value })} />
+          </label>
+        ))}
+      </div>
+      <label className="block mt-3">
+        <span className="kpi-label">Semana del tracker</span>
+        <input className="input mt-1" placeholder="Ej. Semana del 3 de agosto (si las fechas no cuadran con el reporte)"
+          value={value.trackerWeek} onChange={(e) => onChange({ ...value, trackerWeek: e.target.value })} />
+      </label>
+      <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-xs text-neutral-500 border-t border-neutral-100 pt-3">
+        <span>Se calculan solos:</span>
+        <span><b className="text-neutral-800">Total</b> {c.total}</span>
+        {cost.total > 0 && <span><b className="text-neutral-800">Costo por referido</b> {fmtMoney(cost.total)}</span>}
+        {cost.google > 0 && <span><b className="text-neutral-800">Google</b> {fmtMoney(cost.google)}</span>}
+        {cost.facebook > 0 && <span><b className="text-neutral-800">Facebook</b> {fmtMoney(cost.facebook)}</span>}
+      </div>
+    </div>
+  );
+}
+
 export default function ReportForm({ initial, clientName, onSave, onCancel }) {
   const [form, setForm] = useState(
     initial || {
@@ -133,6 +174,7 @@ export default function ReportForm({ initial, clientName, onSave, onCancel }) {
       meta: { ...EMPTY_PLATFORM },
       customKpis: [],
       artes: [],
+      referrals: { ...EMPTY_REFERRALS },
     }
   );
 
@@ -180,6 +222,9 @@ export default function ReportForm({ initial, clientName, onSave, onCancel }) {
         value={form.google} onChange={(v) => set({ google: v })} />
       <PlatformInputs label="Meta Ads" accent={META} icon={<FacebookLogo size={20} />}
         value={form.meta} onChange={(v) => set({ meta: v })} />
+
+      {/* Referidos reportados por el cliente */}
+      <ReferralInputs form={form} onChange={(referrals) => set({ referrals })} />
 
       {/* Artes / creativos activos */}
       <ArtesUploader artes={form.artes || []} onChange={(artes) => set({ artes })} />

@@ -67,8 +67,8 @@ export default function Page() {
     const res = await persist(() => importBackup(data));
     if (!res) return false;
     openDB(res.db, data.clients?.[0]?.id);
-    alert(`Importado: ${res.clients} cliente(s) y ${res.reports} reporte(s).` +
-      (res.skipped ? ` Se omitieron ${res.skipped} reporte(s) sin cliente válido.` : ""));
+    alert(`Importado: ${res.added} reporte(s) nuevo(s) y ${res.updated} actualizado(s).` +
+      (res.skipped ? ` Se omitieron ${res.skipped} que no coincidían con ningún reporte o cliente.` : ""));
     return true;
   };
 

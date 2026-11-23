@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { FileDown, Pencil, Trash2, Link2, Check, Images } from "lucide-react";
+import { FileDown, Pencil, Trash2, Link2, Check, Images, Users } from "lucide-react";
 import KpiGrid, { CustomKpiGrid } from "./KpiGrid";
 import ArtesGallery from "./ArtesGallery";
 import { GoogleLogo, FacebookLogo } from "./Logos";
-import { PlatformBars, SpendDonut, TrendLine, GADS, META } from "./Charts";
-import { computeKpis, sumPlatforms, KPI_DEFS } from "@/lib/kpi";
+import { PlatformBars, SpendDonut, TrendLine, ReferralDonut, ReferralHistory, ReferralCostTrend, GADS, META } from "./Charts";
+import { computeKpis, sumPlatforms, KPI_DEFS, fmtInt, fmtMoney, fmtPct } from "@/lib/kpi";
+import { REF_SOURCES, refCounts, refCosts, hasReferrals } from "@/lib/referrals";
 
 function ComparativeTable({ report }) {
   const g = computeKpis(report.google);
@@ -74,6 +75,69 @@ function PlatformTab({ report, clientReports, platform, accent, label, icon }) {
           title={`Avg. CPC · histórico`} color={accent} money
           subtitle="Costo promedio por clic. Abajo es mejor: cada visita cuesta menos." />
       </div>
+    </div>
+  );
+}
+
+// ── Referidos ───────────────────────────────────────────────────
+function ReferralCards({ report }) {
+  const c = refCounts(report);
+  const cost = refCosts(report);
+  const cards = [
+    { label: "Referidos totales", value: fmtInt(c.total), color: "#16181D" },
+    ...REF_SOURCES.map((s) => ({
+      label: s.label, value: fmtInt(c[s.key]), color: s.color,
+      sub: c.total > 0 ? fmtPct((c[s.key] / c.total) * 100) + " del total" : null,
+      hide: s.key === "other" && !c.other,
+    })),
+    { label: "Costo por referido", value: fmtMoney(cost.total), color: "#10A37F", hide: !cost.total, sub: "Spend total / referidos" },
+    { label: "Costo por referido Google", value: fmtMoney(cost.google), color: "#4285F4", hide: !cost.google, sub: "Spend Google Ads / referidos Google" },
+    { label: "Costo por referido Facebook", value: fmtMoney(cost.facebook), color: "#1E3A8A", hide: !cost.facebook, sub: "Spend Meta Ads / referidos Facebook" },
+  ].filter((x) => !x.hide);
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {cards.map((x) => (
+        <div key={x.label} className="kpi-card avoid-break" style={{ borderTop: `3px solid ${x.color}` }}>
+          <p className="kpi-label">{x.label}</p>
+          <p className="kpi-value">{x.value}</p>
+          {x.sub && <p className="text-[11px] text-neutral-400 mt-0.5">{x.sub}</p>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ReferralTab({ report, clientReports, readOnly }) {
+  if (!hasReferrals(report)) {
+    return (
+      <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-10 text-center text-sm text-neutral-500">
+        {readOnly
+          ? "Este reporte no incluye referidos."
+          : "Aún no hay referidos en este reporte. Agrégalos desde Editar → Referidos."}
+      </div>
+    );
+  }
+  const withRefs = clientReports.filter(hasReferrals);
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <Users size={22} />
+          <h3 className="text-lg font-bold">Referidos</h3>
+        </div>
+        {report.referrals?.trackerWeek && (
+          <p className="text-xs text-neutral-500">Semana del tracker: <b>{report.referrals.trackerWeek}</b></p>
+        )}
+      </div>
+      <ReferralCards report={report} />
+      <div className="grid md:grid-cols-2 gap-4">
+        <ReferralDonut report={report} />
+        {withRefs.length >= 2
+          ? <ReferralCostTrend reports={withRefs} />
+          : <PlatformBars report={report} metric="spend" title="Spend por plataforma" money
+              subtitle="Inversión del periodo que generó estos referidos." />}
+      </div>
+      {withRefs.length >= 2 && <ReferralHistory reports={withRefs} />}
     </div>
   );
 }
@@ -173,6 +237,35 @@ function PrintLayout({ report, clientName }) {
         </table>
       </Section>
 
+      {hasReferrals(report) && (() => {
+        const c = refCounts(report);
+        const cost = refCosts(report);
+        const items = [
+          { label: "Referidos totales", value: fmtInt(c.total), color: "#16181D" },
+          ...REF_SOURCES.filter((x) => x.key !== "other" || c.other).map((x) => ({
+            label: x.label, value: `${fmtInt(c[x.key])}${c.total ? ` · ${fmtPct((c[x.key] / c.total) * 100)}` : ""}`, color: x.color,
+          })),
+          ...(cost.total ? [{ label: "Costo por referido", value: fmtMoney(cost.total), color: "#10A37F" }] : []),
+          ...(cost.google ? [{ label: "Costo por referido Google", value: fmtMoney(cost.google), color: "#4285F4" }] : []),
+          ...(cost.facebook ? [{ label: "Costo por referido Facebook", value: fmtMoney(cost.facebook), color: "#1E3A8A" }] : []),
+        ];
+        return (
+          <Section title="Referidos">
+            {report.referrals?.trackerWeek && (
+              <p style={{ fontSize: 11, color: "#666", marginBottom: 10 }}>Semana del tracker: {report.referrals.trackerWeek}</p>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+              {items.map((it) => (
+                <div key={it.label} style={{ background: "#F5F5F5", borderTop: `3px solid ${it.color}`, padding: "10px 14px", borderRadius: 6 }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, color: "#666", textTransform: "uppercase" }}>{it.label}</div>
+                  <div style={{ fontSize: 17, fontWeight: 700 }}>{it.value}</div>
+                </div>
+              ))}
+            </div>
+          </Section>
+        );
+      })()}
+
       {report.artes?.length > 0 && (
         <Section title="Artes activos" breakBefore>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
@@ -197,7 +290,8 @@ export default function ReportView({ report, clientName, clientReports, shareTok
   const [copied, setCopied] = useState(false);
   const total = sumPlatforms(report.google, report.meta);
 
-  const TABS = ["Resumen", "Google Ads", "Meta Ads", "Comparativo", "Artes"];
+  const showRefs = !readOnly || hasReferrals(report);
+  const TABS = ["Resumen", "Google Ads", "Meta Ads", "Comparativo", ...(showRefs ? ["Referidos"] : []), "Artes"];
 
   const handleShare = async () => {
     if (!shareToken) return alert("Este cliente aún no tiene link. Recarga la página e intenta de nuevo.");
@@ -247,6 +341,7 @@ export default function ReportView({ report, clientName, clientReports, shareTok
             }`}>
             {t === "Google Ads" && <GoogleLogo size={14} />}
             {t === "Meta Ads" && <FacebookLogo size={14} />}
+            {t === "Referidos" && <Users size={14} />}
             {t === "Artes" && <Images size={14} />}
             {t}
           </button>
@@ -261,6 +356,30 @@ export default function ReportView({ report, clientName, clientReports, shareTok
               leads: total.leads, reach: total.reach, conversions: total.conversions,
             }} />
             <CustomKpiGrid items={report.customKpis} />
+            {hasReferrals(report) && (() => {
+              const c = refCounts(report);
+              const cost = refCosts(report);
+              return (
+                <button onClick={() => setTab("Referidos")}
+                  className="w-full text-left rounded-lg bg-white border border-neutral-200 px-5 py-4 hover:border-neutral-400 transition">
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                    <div>
+                      <p className="kpi-label">Referidos</p>
+                      <p className="kpi-value">{fmtInt(c.total)}</p>
+                    </div>
+                    {REF_SOURCES.filter((x) => c[x.key] > 0).map((x) => (
+                      <div key={x.key} className="text-sm">
+                        <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ background: x.color }} />
+                        {x.label} <b>{fmtInt(c[x.key])}</b>
+                      </div>
+                    ))}
+                    {cost.total > 0 && (
+                      <div className="text-sm ml-auto">Costo por referido <b>{fmtMoney(cost.total)}</b></div>
+                    )}
+                  </div>
+                </button>
+              );
+            })()}
             {report.notes && (
               <div className="rounded-lg bg-white border border-neutral-200 p-5">
                 <p className="kpi-label mb-2">Análisis del periodo</p>
@@ -298,6 +417,10 @@ export default function ReportView({ report, clientName, clientReports, shareTok
                 subtitle="Costo promedio de cada clic. La barra más baja es la más eficiente." />
             </div>
           </div>
+        )}
+
+        {tab === "Referidos" && (
+          <ReferralTab report={report} clientReports={clientReports} readOnly={readOnly} />
         )}
 
         {tab === "Artes" && (

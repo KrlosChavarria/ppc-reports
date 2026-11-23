@@ -1,7 +1,8 @@
 "use client";
 
 import { computeKpis, sumPlatforms, fmtInt, fmtMoney, fmtPct } from "@/lib/kpi";
-import { TrendLine, HistoryGrouped } from "./Charts";
+import { TrendLine, HistoryGrouped, ReferralHistory, ReferralCostTrend } from "./Charts";
+import { REF_SOURCES, refCounts, hasReferrals } from "@/lib/referrals";
 
 export default function HistoryPanel({ reports, clientName, onOpen }) {
   // Acumulados de todos los reportes del cliente
@@ -20,6 +21,17 @@ export default function HistoryPanel({ reports, clientName, onOpen }) {
   );
   const accK = computeKpis(acc);
 
+  // Referidos acumulados (solo reportes que los tienen capturados)
+  const withRefs = reports.filter(hasReferrals);
+  const refAcc = withRefs.reduce((a, r) => {
+    const c = refCounts(r);
+    REF_SOURCES.forEach((s) => (a[s.key] += c[s.key]));
+    a.total += c.total;
+    const t = sumPlatforms(r.google, r.meta);
+    a.spend += t.spend;
+    return a;
+  }, { google: 0, facebook: 0, ai: 0, other: 0, total: 0, spend: 0 });
+
   const cards = [
     { label: "Reportes", value: fmtInt(reports.length) },
     { label: "Spend acumulado", value: fmtMoney(accK.spend) },
@@ -30,6 +42,10 @@ export default function HistoryPanel({ reports, clientName, onOpen }) {
     { label: "Clics acumulados", value: fmtInt(accK.clicks) },
     { label: "CTR global", value: fmtPct(accK.ctr) },
     { label: "Avg. CPC global", value: fmtMoney(accK.avgCpc) },
+    { label: "Referidos acumulados", value: fmtInt(refAcc.total), hide: !withRefs.length,
+      sub: REF_SOURCES.filter((s) => refAcc[s.key]).map((s) => `${s.label} ${refAcc[s.key]}`).join(" · ") },
+    { label: "Costo por referido global", value: fmtMoney(refAcc.spend / refAcc.total), hide: !refAcc.total,
+      sub: `En ${withRefs.length} reporte(s) con referidos` },
   ].filter((c) => !c.hide);
 
   return (
@@ -45,6 +61,7 @@ export default function HistoryPanel({ reports, clientName, onOpen }) {
           <div key={c.label} className="kpi-card">
             <p className="kpi-label">{c.label}</p>
             <p className="kpi-value">{c.value}</p>
+            {c.sub && <p className="text-[11px] text-neutral-400 mt-0.5 leading-snug">{c.sub}</p>}
           </div>
         ))}
       </div>
@@ -55,6 +72,16 @@ export default function HistoryPanel({ reports, clientName, onOpen }) {
           <TrendLine reports={reports} platform="total" metric="clicks" title="Clics totales en el tiempo" />
           <HistoryGrouped reports={reports} metric="spend" title="Spend · Google vs Meta por reporte" money />
           <HistoryGrouped reports={reports} metric="clicks" title="Clics · Google vs Meta por reporte" />
+          {withRefs.length >= 2 && (
+            <>
+              <div className="md:col-span-2">
+                <ReferralHistory reports={withRefs} title="Referidos por reporte · por fuente" height={280} />
+              </div>
+              <ReferralCostTrend reports={withRefs} />
+              <TrendLine reports={reports} platform="total" metric="leads" title="Leads (Meta) en el tiempo"
+                subtitle="Para comparar contra los referidos: leads del formulario vs clientes que dijeron de dónde llegaron." />
+            </>
+          )}
         </div>
       ) : (
         <div className="rounded-lg border border-dashed border-neutral-300 bg-white p-8 text-center text-sm text-neutral-500">
@@ -73,6 +100,7 @@ export default function HistoryPanel({ reports, clientName, onOpen }) {
               <th className="px-4 py-3 kpi-label">Clics</th>
               <th className="px-4 py-3 kpi-label">CTR</th>
               <th className="px-4 py-3 kpi-label">Leads</th>
+              <th className="px-4 py-3 kpi-label">Referidos</th>
             </tr>
           </thead>
           <tbody>
@@ -87,6 +115,7 @@ export default function HistoryPanel({ reports, clientName, onOpen }) {
                   <td className="px-4 py-3">{fmtInt(t.clicks)}</td>
                   <td className="px-4 py-3">{fmtPct(t.ctr)}</td>
                   <td className="px-4 py-3">{t.leads ? fmtInt(t.leads) : "—"}</td>
+                  <td className="px-4 py-3">{hasReferrals(r) ? fmtInt(refCounts(r).total) : "—"}</td>
                 </tr>
               );
             })}
